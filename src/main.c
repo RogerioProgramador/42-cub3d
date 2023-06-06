@@ -6,7 +6,7 @@
 /*   By: rsiqueir <rsiqueir@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/06/03 06:09:42 by rsiqueir          #+#    #+#             */
-/*   Updated: 2023/06/05 23:22:57 by rsiqueir         ###   ########.fr       */
+/*   Updated: 2023/06/06 02:54:48 by rsiqueir         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,6 +46,15 @@ int worldMap[mapWidth][mapHeight]=
   {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
+typedef struct s_player {
+  double posX;
+  double posY;
+  double dirX;
+  double dirY;
+  double planeX;
+  double planeY;
+} t_player;
+
 int get_color(int option)
 {
     int red = 255;
@@ -78,47 +87,92 @@ int get_color(int option)
     return color;
 }
 
+void move_player(int key, t_player *player)
+{
+  double moveSpeed = 0.05;
+  double rotSpeed = 0.05;
+
+  if (key == 13) // W key
+  {
+    if (!worldMap[(int)(player->posX + player->dirX * moveSpeed)][(int)(player->posY)])
+      player->posX += player->dirX * moveSpeed;
+    if (!worldMap[(int)(player->posX)][(int)(player->posY + player->dirY * moveSpeed)])
+      player->posY += player->dirY * moveSpeed;
+  }
+  if (key == 1) // S key
+  {
+    if (!worldMap[(int)(player->posX - player->dirX * moveSpeed)][(int)(player->posY)])
+      player->posX -= player->dirX * moveSpeed;
+    if (!worldMap[(int)(player->posX)][(int)(player->posY - player->dirY * moveSpeed)])
+      player->posY -= player->dirY * moveSpeed;
+  }
+  if (key == 0) // A key
+  {
+    double oldDirX = player->dirX;
+    player->dirX = player->dirX * cos(rotSpeed) - player->dirY * sin(rotSpeed);
+    player->dirY = oldDirX * sin(rotSpeed) + player->dirY * cos(rotSpeed);
+    double oldPlaneX = player->planeX;
+    player->planeX = player->planeX * cos(rotSpeed) - player->planeY * sin(rotSpeed);
+    player->planeY = oldPlaneX * sin(rotSpeed) + player->planeY * cos(rotSpeed);
+  }
+  if (key == 2) // D key
+  {
+    double oldDirX = player->dirX;
+    player->dirX = player->dirX * cos(-rotSpeed) - player->dirY * sin(-rotSpeed);
+    player->dirY = oldDirX * sin(-rotSpeed) + player->dirY * cos(-rotSpeed);
+    double oldPlaneX = player->planeX;
+    player->planeX = player->planeX * cos(-rotSpeed) - player->planeY * sin(-rotSpeed);
+    player->planeY = oldPlaneX * sin(-rotSpeed) + player->planeY * cos(-rotSpeed);
+  }
+}
+
+int key_hook(int keycode, t_player *player)
+{
+  if (keycode == 13 || keycode == 1 || keycode == 0 || keycode == 2)
+    {
+        printf("Ratinho\n");
+        move_player(player, keycode); 
+    }
+    else{
+        printf("Caiu aqui mas tecla errada: %i", keycode);
+    }
+    
+  return (0);
+}
+
 int main(void)
 {
     void *mlx;
     void *win;
     t_image img;
-    
-    //posicao inicial do player
+    t_player player;
 
-    double posX = 22, posY = 12;
-
-    //direcao que o player estara no inicio
-    double dirX = -1, dirY = 0;
-    
-    //the 2d raycaster version of camera plane/plano de visao da camera
-    double planeX = 0, planeY = 0.66;
-
+    player.posX = 22;
+    player.posY = 12;
+    player.dirX = -1;
+    player.dirY = 0;
+    player.planeX = 0;
+    player.planeY = 0.66;
 
     double time = 0; //time of current frame
     double oldTime = 0; //time of previous frame
 
-    // screen(screenWidth, screenHeight, 0, "Raycaster");
     create_window(&win, &mlx, screenWidth, screenHeight);
-    printf("oi\n");
-    //cria a imagem na mlx que desenharemos por cima na função draw vertical line
+    
     mlx_new_image(mlx, screenWidth, screenHeight);
     img.pointer = mlx_new_image(mlx, screenWidth, screenHeight);
     img.pixels = mlx_get_data_addr(img.pointer, &(img.bits_per_pixel), &img.line_size, &img.endian);
-    // img->pointer = mlx_new_image(mlx, screenWidth, screenHeight);
-    
-    printf("oi\n");
+
     while(1)
     {
         for(int x = 0; x < screenWidth; x++)
         {
+            double cameraX = 2 * x / (double)screenWidth - 1;
+            double rayDirX = player.dirX + player.planeX * cameraX;
+            double rayDirY = player.dirY + player.planeY * cameraX;
             
-            double cameraX = 2 * x / (double)screenWidth - 1; //x-coordinate in camera space
-            double rayDirX = dirX + planeX * cameraX;
-            double rayDirY = dirY + planeY * cameraX;
-            
-            int mapX = (int)posX;
-            int mapY = (int)posY;
+            int mapX = (int)player.posX;
+            int mapY = (int)player.posY;
 
             double sideDistX;
             double sideDistY;
@@ -136,22 +190,22 @@ int main(void)
             if (rayDirX < 0)
             {
                 stepX = -1;
-                sideDistX = (posX - mapX) * deltaDistX;
+                sideDistX = (player.posX - mapX) * deltaDistX;
             }
             else
             {
                 stepX = 1;
-                sideDistX = (mapX + 1.0 - posX) * deltaDistX;
+                sideDistX = (mapX + 1.0 - player.posX) * deltaDistX;
             }
             if (rayDirY < 0)
             {
                 stepY = -1;
-                sideDistY = (posY - mapY) * deltaDistY;
+                sideDistY = (player.posY - mapY) * deltaDistY;
             }
             else
             {
                 stepY = 1;
-                sideDistY = (mapY + 1.0 - posY) * deltaDistY;
+                sideDistY = (mapY + 1.0 - player.posY) * deltaDistY;
             }
 
             //perform DDA
@@ -201,7 +255,7 @@ int main(void)
                 {color = color / 2;}
                 
             draw_vertical_line(x, drawStart, drawEnd, color, &win, &mlx, &img);
-        }   
+        }
     }
 }
 
